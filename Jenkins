@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage("Clone Code") {
+            steps {
+                echo "Cloning Repo"
+                git url: "https://github.com/Usmancloud/Mise.git", branch: "main"
+            }
+        }
+
+        stage("Build") {
+            steps {
+                echo "Building Docker Image"
+                sh "docker build -t my-note-app ."
+            }
+        }
+
+        stage("Push to Docker") {
+            steps {
+                echo "Pushing to Docker Hub"
+
+                withCredentials([usernamePassword(
+                    credentialsId: "Dockerhub",
+                    usernameVariable: "USER",
+                    passwordVariable: "PASS"
+                )]) {
+
+                    sh """
+                        echo "Logging in..."
+                        echo "$PASS" | docker login -u "$USER" --password-stdin
+
+                        echo "Tagging image..."
+                        docker tag my-note-app $USER/my-note-app:latest
+
+                        echo "Pushing image..."
+                        docker push $USER/my-note-app:latest
+                    """
+                }
+            }
+        }
+
+        stage("Deploy") {
+            steps {
+                echo "Deploying Application"
+
+                sh """
+                    docker stop my-note-app || true
+                    docker rm my-note-app || true
+                    
+                    docker run -d --name my-note-app -p 8000:8000 usmaneghani/my-note-app:latest
+                """
+            }
+        }
+    }
+}
